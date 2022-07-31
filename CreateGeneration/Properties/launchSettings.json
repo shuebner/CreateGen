@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "CreateGeneration": {
+      "commandName": "Project"
+    },
+    "GenerateOnConsumer": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\CreateGeneration.Consumer\\CreateGeneration.Consumer.csproj"
+    }
+  }
+}
