@@ -1,6 +1,11 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 
 namespace SvSoft.CreateGen;
 
@@ -9,45 +14,79 @@ public class CreateSourceGenerator : ISourceGenerator
 {
     public void Execute(GeneratorExecutionContext context)
     {
-        // Find the main method
-        INamedTypeSymbol? programType = context.Compilation.GetTypeByMetadataName("Samples.HelloWorld.Program");
-        if (programType is null)
+        if (context.SyntaxReceiver is AttributeSyntaxReceiver { AttributeCandidates: var attributeCandidates })
         {
-            return;
+            INamedTypeSymbol createAttributeType = context.Compilation.GetTypeByMetadataName("SvSoft.CreateGen.CreateAttribute")
+                ?? throw new ArgumentException("Did not find Create attribute type. This is a bug.");
+
+            foreach (AttributeSyntax attribute in attributeCandidates)
+            {
+                SemanticModel semanticModel = context.Compilation.GetSemanticModel(attribute.SyntaxTree);
+                TypeInfo typeInfo = semanticModel.GetTypeInfo(attribute);
+                if (typeInfo.Type is INamedTypeSymbol type && type.Equals(context.Compilation.GetTypeByMetadataName("SvSoft.CreateGen.CreateAttribute"), SymbolEqualityComparer.Default))
+                {
+                    Generate(attribute);
+                }
+            }
         }
 
-        var helloFromMethodCandidates = programType.GetMembers().OfType<IMethodSymbol>()
-            .Where(m => m.Name.Equals("HelloFrom", StringComparison.Ordinal));
-
-        IMethodSymbol? helloFromMethod = helloFromMethodCandidates.Where(m => !m.IsGenericMethod && m.Parameters.Length == 1 && m.Parameters[0].Type.Equals(context.Compilation.GetSpecialType(SpecialType.System_String).WithNullableAnnotation(NullableAnnotation.NotAnnotated), SymbolEqualityComparer.IncludeNullability))
-            .SingleOrDefault();
-
-        if (helloFromMethod is null)
+        void Generate(AttributeSyntax attribute)
         {
-            return;
-        }
-
-        // Build up the source code
-        string source = $@"// Auto-generated code
-using System;
-
-namespace {programType.ContainingNamespace.ToDisplayString()}
-{{
-    partial class {programType.Name}
+            if (attribute.Parent?.Parent is ClassDeclarationSyntax classDeclaration)
+            {
+                SemanticModel semanticModel = context.Compilation.GetSemanticModel(classDeclaration.SyntaxTree);
+                if (semanticModel.GetDeclaredSymbol(classDeclaration) is INamedTypeSymbol typeSymbol)
+                {
+                    if (classDeclaration.Parent is NamespaceDeclarationSyntax namespaceDeclaration)
+                    {
+                        string className = classDeclaration.Identifier.Text;
+                        StringBuilder sb = new();
+                        string generatedCode = $@"// Auto-generated code
+namespace {namespaceDeclaration.Name.GetText()}{{
+    partial class {className}
     {{
-        static partial void HelloFrom(string name) =>
-            Console.WriteLine($""Generator says: Hi from '{{name}}'"");
+        {string.Join(Environment.NewLine, typeSymbol.Constructors.Select(c => $"        {GetCreateMethod(c)}"))}
     }}
 }}
 ";
-        var typeName = programType.Name;
 
-        // Add the source code to the compilation
-        context.AddSource($"{typeName}.g.cs", source);
+                        var syntaxTree = CSharpSyntaxTree.ParseText(generatedCode);
+                        var formattedText = syntaxTree.GetRoot().NormalizeWhitespace().GetText(Encoding.UTF8);
+
+                        context.AddSource($"{className}.g.cs", formattedText);
+
+                        string GetCreateMethod(IMethodSymbol ctor)
+                        {
+                            return @$"{SyntaxFacts.GetText(ctor.DeclaredAccessibility)} static {className} Create()
+{{
+    return new {className}();
+}}";
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public void Initialize(GeneratorInitializationContext context)
     {
-        // No initialization required for this one
+        context.RegisterForSyntaxNotifications(() => new AttributeSyntaxReceiver());
+    }
+
+    sealed class AttributeSyntaxReceiver : ISyntaxReceiver
+    {
+        public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
+        {
+            if (syntaxNode is AttributeSyntax attribute)
+            {
+                if (attribute.Name is QualifiedNameSyntax { Right.Identifier.Text: "Create" }
+                                   or SimpleNameSyntax { Identifier.Text: "Create" })
+                {
+                    AttributeCandidates.Add(attribute);
+                }
+            }
+        }
+
+        public List<AttributeSyntax> AttributeCandidates { get; } = new();
     }
 }
