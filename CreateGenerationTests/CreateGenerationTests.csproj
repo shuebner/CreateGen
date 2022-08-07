@@ -22,4 +22,14 @@
     <ProjectReference Include="..\CreateGeneration\CreateGeneration.csproj" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <__SampleRoot>../Samples</__SampleRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <__ExcludedFolders Include="obj" />
+    <__ExcludedFolders Include="bin" />
+    <__Exclude Include="@(__ExcludedFolders->'$(__SampleRoot)/%(Identity)/**/*')" />
+    <Content Include="$(__SampleRoot)/**/*" Exclude="@(__Exclude)" LinkBase="Samples" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
 </Project>

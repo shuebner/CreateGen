@@ -6,6 +6,10 @@
     "GenerateOnConsumer": {
       "commandName": "DebugRoslynComponent",
       "targetProject": "..\\CreateGeneration.Consumer\\CreateGeneration.Consumer.csproj"
+    },
+    "Samples": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\Samples\\Samples.csproj"
     }
   }
 }

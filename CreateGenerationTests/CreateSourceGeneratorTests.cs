@@ -16,7 +16,7 @@ public class CreateSourceGeneratorTests
     {
         var code = @"
 #nullable enable
-namespace Test
+namespace Samples.HelloWorld
 {
     partial class Program
     {
@@ -30,10 +30,10 @@ namespace Test
 }
 #nullable restore
 ";
-        var expectedGeneratedCode = @" // Auto-generated code
+        var expectedGeneratedCode = @"// Auto-generated code
 using System;
 
-namespace Test
+namespace Samples.HelloWorld
 {
     partial class Program
     {
@@ -55,4 +55,31 @@ namespace Test
             },
         }.RunAsync();
     }
+
+
+    [Test]
+    [TestCaseSource(nameof(Samples))]
+    public Task Creates_a_static_method2(string code, string expectedGeneratedCode)
+    {
+        return new VerifyCS.Test
+        {
+            TestState =
+            {
+                Sources = { code },
+                GeneratedSources =
+                {
+                    (typeof(CreateSourceGenerator), "Program.g.cs", SourceText.From(expectedGeneratedCode, Encoding.UTF8, SourceHashAlgorithm.Sha1)),
+                },
+            },
+        }.RunAsync();
+    }
+
+    public static readonly IEnumerable<TestCaseData> Samples = Directory.GetFiles(
+        Path.Combine(TestContext.CurrentContext.TestDirectory, "Samples"), "*.cs", SearchOption.AllDirectories)
+        .Select(f => (FilePath: f, SampleDirectory: f.Split(Path.DirectorySeparatorChar)[^2]))
+        .GroupBy(pair => pair.SampleDirectory)
+        .Select(group => new TestCaseData(
+            File.ReadAllText(group.Single(e => e.FilePath.EndsWith("Input.cs")).FilePath),
+            File.ReadAllText(group.Last(e => e.FilePath.EndsWith("GeneratedCode.cs")).FilePath))
+            .SetArgDisplayNames(group.Key));
 }

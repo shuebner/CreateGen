@@ -10,7 +10,7 @@ public class CreateSourceGenerator : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         // Find the main method
-        INamedTypeSymbol? programType = context.Compilation.GetTypeByMetadataName("Test.Program");
+        INamedTypeSymbol? programType = context.Compilation.GetTypeByMetadataName("Samples.HelloWorld.Program");
         if (programType is null)
         {
             return;
@@ -28,7 +28,7 @@ public class CreateSourceGenerator : ISourceGenerator
         }
 
         // Build up the source code
-        string source = $@" // Auto-generated code
+        string source = $@"// Auto-generated code
 using System;
 
 namespace {programType.ContainingNamespace.ToDisplayString()}
